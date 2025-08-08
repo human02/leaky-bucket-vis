@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaky Bucket Algorithm Visualization</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Custom styles for Shadcn UI look-alike and animations */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        :root {
+            --background: 0 0% 100%;
+            --foreground: 222.2 84% 4.9%;
+            --card: 0 0% 100%;
+            --card-foreground: 222.2 84% 4.9%;
+            --popover: 0 0% 100%;
+            --popover-foreground: 222.2 84% 4.9%;
+            --primary: 222.2 47.4% 11.2%;
+            --primary-foreground: 210 40% 98%;
+            --muted: 210 40% 96.1%;
+            --muted-foreground: 215.4 16.3% 46.9%;
+            --border: 214.3 31.8% 91.4%;
+            --input: 214.3 31.8% 91.4%;
+            --ring: 222.2 84% 4.9%;
+        }
+
+        .dark {
+            --background: 222.2 84% 4.9%;
+            --foreground: 210 40% 98%;
+            --card: 222.2 84% 4.9%;
+            --card-foreground: 210 40% 98%;
+            --popover: 222.2 84% 4.9%;
+            --popover-foreground: 210 40% 98%;
+            --primary: 210 40% 98%;
+            --primary-foreground: 222.2 47.4% 11.2%;
+            --muted: 217.2 32.6% 17.5%;
+            --muted-foreground: 215 20.2% 65.1%;
+            --border: 217.2 32.6% 17.5%;
+            --input: 217.2 32.6% 17.5%;
+            --ring: 212.7 26.8% 83.9%;
+        }
+
+        .bg-background {
+            background-color: hsl(var(--background));
+        }
+
+        .text-foreground {
+            color: hsl(var(--foreground));
+        }
+
+        .bg-card {
+            background-color: hsl(var(--card));
+        }
+
+        .text-card-foreground {
+            color: hsl(var(--card-foreground));
+        }
+
+        .bg-primary {
+            background-color: hsl(var(--primary));
+        }
+
+        .text-primary-foreground {
+            color: hsl(var(--primary-foreground));
+        }
+
+        .text-muted-foreground {
+            color: hsl(var(--muted-foreground));
+        }
+
+        .border-border {
+            border-color: hsl(var(--border));
+        }
+
+        @keyframes drop-in {
+            0% {
+                transform: translateY(-100px);
+                opacity: 0;
+            }
+
+            100% {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .animate-drop-in {
+            animation: drop-in 0.5s ease-out forwards;
+        }
+
+        @keyframes drop-reject {
+            0% {
+                transform: translateY(-100px) translateX(0);
+                opacity: 0;
+            }
+
+            50% {
+                transform: translateY(0) translateX(0);
+                opacity: 1;
+            }
+
+            100% {
+                transform: translateY(20px) translateX(-50px) rotate(-30deg);
+                opacity: 0;
+            }
+        }
+
+        .animate-drop-reject {
+            animation: drop-reject 0.8s ease-in-out forwards;
+        }
+
+        @keyframes leak-out {
+            0% {
+                transform: translateY(0);
+                opacity: 1;
+            }
+
+            100% {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+        }
+
+        .animate-leak-out {
+            animation: leak-out 1.5s ease-in forwards;
+        }
+    </style>
+</head>
+
+<body class="bg-background text-foreground transition-colors duration-300">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <!-- Header and Dark Mode Toggle -->
+        <header class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl md:text-3xl font-bold">Leaky Bucket Algorithm</h1>
+            <button id="darkModeToggle" class="p-2 rounded-full hover:bg-muted/50 transition-colors">
+                <svg id="moonIcon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    class="lucide lucide-moon">
+                    <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+                </svg>
+                <svg id="sunIcon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    class="lucide lucide-sun hidden">
+                    <circle cx="12" cy="12" r="4" />
+                    <path d="M12 2v2" />
+                    <path d="M12 20v2" />
+                    <path d="m4.93 4.93 1.41 1.41" />
+                    <path d="m17.66 17.66 1.41 1.41" />
+                    <path d="M2 12h2" />
+                    <path d="M20 12h2" />
+                    <path d="m6.34 17.66-1.41 1.41" />
+                    <path d="m19.07 4.93-1.41 1.41" />
+                </svg>
+            </button>
+        </header>
+
+        <div class="flex flex-col md:flex-row gap-8">
+
+            <!-- Left Side: Visualization -->
+            <div class="w-full md:w-1/2 lg:w-2/5">
+                <div class="bg-card border border-border rounded-lg p-6 shadow-sm">
+                    <div class="flex justify-between items-center mb-2">
+                        <h2 class="text-xl font-semibold text-card-foreground">Bucket Visualization</h2>
+                        <span id="queueStatus" class="font-mono text-sm text-muted-foreground">0 / 10</span>
+                    </div>
+
+                    <!-- Status Message -->
+                    <div id="statusMessage" class="h-6 text-center font-medium mb-2">&nbsp;</div>
+
+                    <!-- The Bucket -->
+                    <div id="request-area" class="relative h-96 w-full mb-4">
+                        <!-- Incoming Request -->
+                        <div id="incoming-request-container" class="absolute top-0 left-1/2 -translate-x-1/2 h-20 w-8">
+                        </div>
+                        <!-- Bucket Visual -->
+                        <div
+                            class="absolute bottom-0 left-0 w-full h-80 border-4 border-t-0 border-border rounded-b-3xl bg-muted/20 overflow-hidden">
+                            <div id="bucket-water"
+                                class="absolute bottom-0 left-0 w-full bg-blue-500/30 transition-all duration-500 ease-in-out"
+                                style="height: 0%;"></div>
+                            <div id="bucket-queue"
+                                class="relative h-full w-full flex flex-col-reverse items-center p-2 gap-1">
+                                <!-- Request items will be added here -->
+                            </div>
+                        </div>
+                        <!-- Leaking Request -->
+                        <div id="leaking-request-container"
+                            class="absolute bottom-[-50px] left-1/2 -translate-x-1/2 h-12 w-8"></div>
+                    </div>
+
+                    <!-- Controls -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+                        <button id="addRequestBtn"
+                            class="w-full bg-primary text-primary-foreground font-semibold py-2 px-4 rounded-md hover:bg-primary/90 transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background">
+                            Make API Request
+                        </button>
+                        <div>
+                            <label for="leakRateSelector"
+                                class="block text-sm font-medium text-muted-foreground mb-1.5">Leak Rate</label>
+                            <select id="leakRateSelector"
+                                class="w-full bg-card border border-border rounded-md py-2 px-3 focus:outline-none focus:ring-2 focus:ring-ring">
+                                <option value="4000">Slow (1 per 4s)</option>
+                                <option value="2000" selected>Normal (1 per 2s)</option>
+                                <option value="500">Fast (1 per 0.5s)</option>
+                                <option value="9999999">Disabled</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Side: Explanation -->
+            <div class="w-full md:w-1/2 lg:w-3/5">
+                <div class="bg-card border border-border rounded-lg p-6 shadow-sm">
+                    <h2 class="text-xl font-semibold text-card-foreground mb-4">How It Works</h2>
+                    <div class="space-y-4 text-muted-foreground">
+                        <div class="flex items-start gap-4">
+                            <div
+                                class="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm">
+                                1</div>
+                            <div>
+                                <h3 class="font-semibold text-foreground mb-1">The Analogy</h3>
+                                <p>Imagine a bucket with a small hole at the bottom. This bucket represents a queue that
+                                    can hold incoming API requests. The bucket has a fixed capacity, just like the queue
+                                    has a finite size.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-4">
+                            <div
+                                class="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm">
+                                2</div>
+                            <div>
+                                <h3 class="font-semibold text-foreground mb-1">Incoming Requests (Filling the Bucket)
+                                </h3>
+                                <p>When a new request arrives, it's like a drop of water being added to the bucket. If
+                                    there's space, the request is placed in the queue (the bucket). Click the 'Make API
+                                    Request' button to see this happen.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-4">
+                            <div
+                                class="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm">
+                                3</div>
+                            <div>
+                                <h3 class="font-semibold text-foreground mb-1">The Queue (Water in the Bucket)</h3>
+                                <p>The requests in the bucket form a First-In, First-Out (FIFO) queue. The first request
+                                    that came in will be the first one to be processed, just as the water at the bottom
+                                    of the bucket leaks out first.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-4">
+                            <div
+                                class="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm">
+                                4</div>
+                            <div>
+                                <h3 class="font-semibold text-foreground mb-1">The Leak (Processing Requests)</h3>
+                                <p>The hole in the bucket allows requests to "leak" out at a constant, fixed rate. This
+                                    represents processing the requests. Crucially, this leak rate is independent of how
+                                    quickly requests arrive (the "burstiness" of the input).</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-4">
+                            <div
+                                class="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm">
+                                5</div>
+                            <div>
+                                <h3 class="font-semibold text-foreground mb-1">Bucket Overflow (Handling Excess Load)
+                                </h3>
+                                <p>If requests arrive faster than they can leak out, the bucket will fill up. If a new
+                                    request arrives when the bucket is already at full capacity, it is rejected or
+                                    "dropped". It cannot be added to the queue.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-4">
+                            <div
+                                class="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm">
+                                6</div>
+                            <div>
+                                <h3 class="font-semibold text-foreground mb-1">The Outcome (Smoothed Output)</h3>
+                                <p>The key benefit of the Leaky Bucket algorithm is that it takes a potentially bursty,
+                                    unpredictable stream of incoming requests and turns it into a smooth, constant, and
+                                    predictable output stream of processed requests.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM Elements ---
+            const addRequestBtn = document.getElementById('addRequestBtn');
+            const leakRateSelector = document.getElementById('leakRateSelector');
+            const bucketQueueDiv = document.getElementById('bucket-queue');
+            const bucketWaterDiv = document.getElementById('bucket-water');
+            const queueStatusSpan = document.getElementById('queueStatus');
+            const statusMessageDiv = document.getElementById('statusMessage');
+            const incomingContainer = document.getElementById('incoming-request-container');
+            const leakingContainer = document.getElementById('leaking-request-container');
+            const darkModeToggle = document.getElementById('darkModeToggle');
+            const moonIcon = document.getElementById('moonIcon');
+            const sunIcon = document.getElementById('sunIcon');
+
+            // --- State Variables ---
+            const BUCKET_CAPACITY = 10;
+            let requestQueue = [];
+            let leakRate = parseInt(leakRateSelector.value, 10);
+            let leakIntervalId = null;
+            let requestIdCounter = 0;
+
+            // --- Core Functions ---
+
+            /**
+             * Creates a visual representation of a request.
+             */
+            function createRequestElement(id) {
+                const requestEl = document.createElement('div');
+                requestEl.id = `req-${id}`;
+                requestEl.className = 'w-6 h-6 bg-blue-500 rounded-full flex-shrink-0';
+                return requestEl;
+            }
+
+            /**
+             * Updates all visual elements based on the current state.
+             */
+            function updateVisuals() {
+                // Update queue count text
+                queueStatusSpan.textContent = `${requestQueue.length} / ${BUCKET_CAPACITY}`;
+
+                // Update water level
+                const waterHeight = (requestQueue.length / BUCKET_CAPACITY) * 100;
+                bucketWaterDiv.style.height = `${waterHeight}%`;
+            }
+
+            /**
+             * Displays a status message for a short duration.
+             */
+            function showStatusMessage(text, colorClass) {
+                statusMessageDiv.textContent = text;
+                statusMessageDiv.className = `h-6 text-center font-medium mb-2 ${colorClass}`;
+                setTimeout(() => {
+                    if (statusMessageDiv.textContent === text) {
+                        statusMessageDiv.innerHTML = '&nbsp;';
+                    }
+                }, 2500);
+            }
+
+            /**
+             * Handles adding a new request to the bucket.
+             */
+            function addRequest() {
+                const incomingRequestEl = createRequestElement('incoming');
+
+                if (requestQueue.length < BUCKET_CAPACITY) {
+                    incomingContainer.appendChild(incomingRequestEl);
+                    incomingRequestEl.classList.add('animate-drop-in');
+
+                    showStatusMessage('Request Added to Queue', 'text-green-500');
+
+                    incomingRequestEl.addEventListener('animationend', () => {
+                        incomingContainer.innerHTML = ''; // Clean up
+                        const newRequestId = ++requestIdCounter;
+                        const newRequest = { id: newRequestId };
+                        requestQueue.push(newRequest);
+
+                        const queuedRequestEl = createRequestElement(newRequestId);
+                        bucketQueueDiv.prepend(queuedRequestEl);
+
+                        updateVisuals();
+                    }, { once: true });
+
+                } else {
+                    incomingContainer.appendChild(incomingRequestEl);
+                    incomingRequestEl.classList.add('animate-drop-reject');
+                    showStatusMessage('Bucket Full - Request Dropped', 'text-red-500');
+                    incomingRequestEl.addEventListener('animationend', () => {
+                        incomingContainer.innerHTML = ''; // Clean up
+                    }, { once: true });
+                }
+            }
+
+            /**
+             * Processes one request from the queue (the "leak").
+             */
+            function processRequest() {
+                if (requestQueue.length > 0) {
+                    const processedRequest = requestQueue.shift(); // FIFO
+                    const requestElToRemove = document.getElementById(`req-${processedRequest.id}`);
+
+                    if (requestElToRemove) {
+                        requestElToRemove.remove();
+                    }
+
+                    const leakingRequestEl = createRequestElement('leaking');
+                    leakingContainer.appendChild(leakingRequestEl);
+                    leakingRequestEl.classList.add('animate-leak-out');
+
+                    showStatusMessage('Request Processed', 'text-blue-500');
+
+                    leakingRequestEl.addEventListener('animationend', () => {
+                        leakingContainer.innerHTML = ''; // Clean up
+                    }, { once: true });
+
+                    updateVisuals();
+                }
+            }
+
+            /**
+             * Starts the interval for processing requests.
+             */
+            function startLeaking() {
+                if (leakIntervalId) {
+                    clearInterval(leakIntervalId);
+                }
+                leakIntervalId = setInterval(processRequest, leakRate);
+            }
+
+            // --- Dark Mode ---
+            function setDarkMode(isDark) {
+                if (isDark) {
+                    document.documentElement.classList.add('dark');
+                    moonIcon.classList.add('hidden');
+                    sunIcon.classList.remove('hidden');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                    moonIcon.classList.remove('hidden');
+                    sunIcon.classList.add('hidden');
+                }
+            }
+
+            // --- Event Listeners ---
+            addRequestBtn.addEventListener('click', addRequest);
+
+            leakRateSelector.addEventListener('change', (e) => {
+                leakRate = parseInt(e.target.value, 10);
+                startLeaking();
+            });
+
+            darkModeToggle.addEventListener('click', () => {
+                const isDark = document.documentElement.classList.contains('dark');
+                setDarkMode(!isDark);
+                localStorage.setItem('darkMode', !isDark);
+            });
+
+            // --- Initialization ---
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const savedTheme = localStorage.getItem('darkMode');
+            if (savedTheme !== null) {
+                setDarkMode(savedTheme === 'true');
+            } else {
+                setDarkMode(prefersDark);
+            }
+
+            updateVisuals();
+            startLeaking();
+        });
+    </script>
+</body>
+
+</html>
