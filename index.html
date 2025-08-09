@@ -455,9 +455,9 @@
         /* Bucket Visualization Styles */
         .bucket-container {
             position: relative;
-            height: 24rem;
+            height: 20rem;
             width: 100%;
-            margin-bottom: 1rem;
+            margin-bottom: 0.5rem;
         }
 
         .bucket-visual {
@@ -552,6 +552,8 @@
 
         .dark .queue-status {
             color: #d1d5db;
+            background: #1f2937 !important;
+            border: 1px solid #374151;
         }
 
         /* Animation Classes */
@@ -644,11 +646,21 @@
         /* Control Section */
         .control-section {
             padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+            height: auto;
+        }
+
+        .control-panel {
+            width: 100%;
+            max-width: 220px;
         }
 
         .control-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr;
             gap: 1rem;
             align-items: end;
         }
@@ -819,18 +831,20 @@
         <div class="grid lg:grid-cols-2">
             <div>
                 <div class="card">
-                    <div class="flex flex-row" style="gap:4rem; align-items: flex-start;">
-                        <div style="flex:2; min-width:260px;">
-                            <div class="flex justify-between items-center mb-2">
+                    <div class="flex flex-row" style="gap: 2rem; align-items: center;">
+                        <div style="flex: 2; min-width: 260px;">
+                            <div class="mb-2">
                                 <h2 class="text-xl font-semibold text-gray-800 dark:text-white">Bucket Visualization
                                 </h2>
-                                <span id="queueStatus" class="queue-status">0 / 10</span>
                             </div>
                             <div id="statusMessage" class="status-message status-info mb-2"
                                 style="min-height: 60px; display: flex; align-items: center; justify-content: center; max-width: 300px; margin: 0 auto 1rem;">
                                 Ready to accept API requests
                             </div>
-                            <div class="bucket-container" style="margin-bottom:5;">
+                            <div class="bucket-container">
+                                <span id="queueStatus" class="queue-status"
+                                    style="position: absolute; top: 20px; left: 80px; background: white; padding: 0.25rem 0.5rem; border-radius: 0.5rem; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); z-index: 30;">0
+                                    / 10</span>
                                 <div id="incoming-request-container" class="incoming-request-container"></div>
                                 <div class="bucket-visual">
                                     <div id="bucket-water" class="bucket-water" style="height: 0%;"></div>
@@ -840,23 +854,27 @@
                                 <div id="leaking-request-container" class="leaking-request-container"></div>
                             </div>
                         </div>
-                        <div style="flex:1; min-width:220px;">
-                            <div class="card control-section" style="margin-bottom:0;">
-                                <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-300 mb-4">Configuration
-                                </h3>
-                                <div class="control-grid" style="grid-template-columns:1fr;">
-                                    <div>
-                                        <label for="leakRateSelector" class="control-label">Leak Rate</label>
-                                        <select id="leakRateSelector" class="select">
-                                            <option value="4000">Slow (1 per 4s)</option>
-                                            <option value="2000" selected>Normal (1 per 2s)</option>
-                                            <option value="500">Fast (1 per 0.5s)</option>
-                                            <option value="9999999">Disabled</option>
-                                        </select>
+                        <div
+                            style="flex: 1; min-width: 220px; display: flex; align-items: flex-end; justify-content: center;">
+                            <div class="card control-section" style="margin-bottom: 0; width: 100%; max-width: 250px;">
+                                <div class="control-panel">
+                                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-300 mb-4">
+                                        Configuration
+                                    </h3>
+                                    <div class="control-grid">
+                                        <div>
+                                            <label for="leakRateSelector" class="control-label">Leak Rate</label>
+                                            <select id="leakRateSelector" class="select">
+                                                <option value="4000">Slow (1 per 4s)</option>
+                                                <option value="2000" selected>Normal (1 per 2s)</option>
+                                                <option value="500">Fast (1 per 0.5s)</option>
+                                                <option value="9999999">Disabled</option>
+                                            </select>
+                                        </div>
+                                        <button id="addRequestBtn" class="btn btn-primary" style="margin-top: 1rem;">
+                                            Make API Request
+                                        </button>
                                     </div>
-                                    <button id="addRequestBtn" class="btn btn-primary" style="margin-top:1rem;">
-                                        Make API Request
-                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -1028,7 +1046,7 @@
                 const waterHeight = (requestQueue.length / BUCKET_CAPACITY) * 100;
                 bucketWaterDiv.style.height = `${waterHeight}%`;
 
-                // Fix: Always show exactly requestQueue.length dots, never more
+                // Clear and rebuild the queue visualization to match actual queue
                 bucketQueueDiv.innerHTML = "";
                 for (let i = 0; i < requestQueue.length; i++) {
                     const req = requestQueue[i];
@@ -1072,8 +1090,10 @@
              */
             function processNextPendingRequest() {
                 if (pendingRequests.length > 0 && !isProcessingRequest) {
-                    const nextRequest = pendingRequests.shift();
-                    executeRequest(nextRequest);
+                    // Re-evaluate the request type based on current bucket state
+                    const requestType = requestQueue.length < BUCKET_CAPACITY ? 'accept' : 'reject';
+                    pendingRequests.shift(); // Remove the pending request
+                    executeRequest(requestType);
                 }
             }
 
@@ -1099,9 +1119,7 @@
                         const newRequest = { id: newRequestId };
                         requestQueue.push(newRequest);
 
-                        const queuedRequestEl = createRequestElement(newRequestId);
-                        bucketQueueDiv.appendChild(queuedRequestEl);
-
+                        // Update visuals instead of manually adding elements
                         updateVisuals();
                         isProcessingRequest = false;
 
@@ -1127,14 +1145,13 @@
              * Handles adding a new request to the bucket.
              */
             function addRequest() {
-                // Only count actual requests in the queue for capacity check
-                const requestType = requestQueue.length < BUCKET_CAPACITY ? 'accept' : 'reject';
-
                 if (!isProcessingRequest) {
+                    // Check current capacity and execute immediately
+                    const requestType = requestQueue.length < BUCKET_CAPACITY ? 'accept' : 'reject';
                     executeRequest(requestType);
                 } else {
-                    // Queue the request for later processing
-                    pendingRequests.push(requestType);
+                    // Just add to pending queue, decision will be made when processed
+                    pendingRequests.push('pending');
                 }
             }
 
